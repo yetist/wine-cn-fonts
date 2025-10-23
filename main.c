@@ -8,9 +8,9 @@
 
 LPCWSTR chinese_linux_fonts[] = {
     L"wqy-microhei.ttc",
-    L"wqy-zenhei.ttc",
+    L"SourceHanSansCN-Regular.otf",
     L"NotoSerifCJK-Regular.ttc",
-    L"SourceHanSansCN-Normal.otf",
+    L"NotoSansCJK-Regular.ttc",
     NULL
 };
 
@@ -104,7 +104,7 @@ static BOOL write_reg_key(HKEY hkey, LPCWSTR name, LPCWSTR value)
             }
             result = RegQueryValueExW(hkey, name, 0, 0, (LPBYTE)value_data, &size);
             if (result != ERROR_SUCCESS) {
-                if (value_data){
+                if (value_data != NULL){
                     HeapFree(GetProcessHeap(), 0, value_data);
                 }
                 return FALSE;
@@ -121,12 +121,12 @@ static BOOL write_reg_key(HKEY hkey, LPCWSTR name, LPCWSTR value)
                 result = RegSetValueExW(hkey, name, 0, type, (LPBYTE)buf, (DWORD)bufsize);
                 HeapFree(GetProcessHeap(), 0, buf);
                 if (result != ERROR_SUCCESS) {
-                    if (value_data)
+                    if (value_data != NULL)
                         HeapFree(GetProcessHeap(), 0, value_data);
                     return FALSE;
                 }
             }
-            if (value_data){
+            if (value_data != NULL){
                 HeapFree(GetProcessHeap(), 0, value_data);
             }
         }
@@ -224,15 +224,65 @@ static void wine_systemlink_font(LPCWSTR font_file)
     RegCloseKey(key);
 }
 
+static void usage(void)
+{
+    console_printf(L"用法: wine-cn-fonts.exe [选项]...\n");
+    console_printf(L"为 wine 配置中文字体\n\n");
+    console_printf(L"-h             显示帮助\n");
+    console_printf(L"-l <font>      配置<font>为链接字体\n");
+    console_printf(L"-r <font>      配置<font>为替换字体\n");
+}
+
 int wmain(int argc, wchar_t **argv)
 {
+    int i;
+
     SetConsoleOutputCP(65001);
 
-    for (int i = 0; chinese_linux_fonts[i]; ++i) {
-        if (linux_has_font(chinese_linux_fonts[i])) {
-            wine_systemlink_font(chinese_linux_fonts[i]);
-            break;
+    if (argc == 1){
+        for (int i = 0; chinese_linux_fonts[i]; ++i) {
+            if (linux_has_font(chinese_linux_fonts[i])) {
+                wine_systemlink_font(chinese_linux_fonts[i]);
+                break;
+            }
+        }
+        return 0;
+    }
+
+    for (i = 1; i < argc; ++i)
+    {
+        if (wcscmp(argv[i], L"-h") == 0 || wcscmp(argv[i], L"/?") == 0) {
+            usage();
+            return 0;
+        }
+
+        if (wcslen(argv[i]) == 2 && (argv[i][0] == L'-' || argv[i][0] == L'/'))
+        {
+            switch (towupper(argv[i][1]))
+            {
+                case L'L':
+                    if (++i < argc) {
+                        wine_systemlink_font(argv[i]);
+                    } else {
+                        console_printf(L"require argument for -l option\n");
+                        usage();
+                        return 1;
+                    }
+                    break;
+                case L'R':
+                    if (++i < argc) {
+                        console_printf(L"replate font name: %ls\n", argv[i]);
+                    } else {
+                        console_printf(L"require argument for -r option\n");
+                        usage();
+                        return 1;
+                    }
+                    break;
+                default:
+                    return 1;
+            }
         }
     }
+
     return 0;
 }
